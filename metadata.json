@@ -1,0 +1,6 @@
+{
+  "name": "Job Schedule & Travel Tracker",
+  "description": "Maintain multiple job schedules, see work locations, and calculate/display travel times between consecutive shifts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

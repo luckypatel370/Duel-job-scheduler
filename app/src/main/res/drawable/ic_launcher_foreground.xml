@@ -1,0 +1,62 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer shadow ring base -->
+    <path
+        android:fillColor="#15FFFFFF"
+        android:pathData="M54,18 A36,36 0 1,0 54,90 A36,36 0 1,0 54,18 Z" />
+
+    <!-- Clock face rim -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,24 A30,30 0 1,0 54,84 A30,30 0 1,0 54,24 Z" />
+
+    <!-- Clock time ticks -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,24L54,29 M54,84L54,79 M24,54L29,54 M84,54L79,54" />
+
+    <!-- Chronological route trace line linking schedule stops -->
+    <path
+        android:strokeColor="#48CFAD"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M38,54 C44,38 48,70 54,44 C60,20 64,64 70,54" />
+
+    <!-- Transit vehicles or pin indicators along route -->
+    <!-- Location Pin 1 -->
+    <path
+        android:fillColor="#FFCE54"
+        android:pathData="M38,46 A3,3 0 1,1 38,52 A3,3 0 1,1 38,46 Z" />
+
+    <!-- Clock hands indicating shift hours -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L54,38" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L68,54" />
+
+    <!-- Main Location Pin 2 -->
+    <path
+        android:fillColor="#FC6E51"
+        android:pathData="M67,37 C67,31 73,31 73,37 C73,43 67,49 67,49 C67,49 61,43 61,37 C61,31 67,31 67,37 Z" />
+    <!-- Pin 2 center hole -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M67,35 A1.5,1.5 0 1,0 67,38 A1.5,1.5 0 1,0 67,35 Z" />
+</vector>
