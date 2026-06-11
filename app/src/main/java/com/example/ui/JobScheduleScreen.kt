@@ -76,6 +76,7 @@ fun JobScheduleScreen(
 
     var showAddJobDialog by remember { mutableStateOf(false) }
     var showAddShiftDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf(0) } // 0 = Schedule, 1 = Job Profiles
 
     // Date range preparation for calendar strip (centered around selected/today)
@@ -109,6 +110,21 @@ fun JobScheduleScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showExportDialog = true },
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                            .size(40.dp)
+                            .testTag("open_export_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Export schedule to Calendar",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = { viewModel.recalculateTransit(selectedDate) },
                         modifier = Modifier
@@ -258,6 +274,158 @@ fun JobScheduleScreen(
             onConfirm = { jobId, date, start, end, mode, notes ->
                 viewModel.addShift(jobId, date, start, end, mode, notes)
                 showAddShiftDialog = false
+            }
+        )
+    }
+
+    if (showExportDialog) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        
+        // Calculate week relative to selectedDate
+        val relativeWeekShifts = remember(shifts, selectedDate) {
+            try {
+                val parsedDate = LocalDate.parse(selectedDate)
+                val monday = parsedDate.minusDays((parsedDate.dayOfWeek.value - 1).toLong())
+                val sunday = monday.plusDays(6)
+                shifts.filter {
+                    try {
+                        val d = LocalDate.parse(it.date)
+                        !d.isBefore(monday) && !d.isAfter(sunday)
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Sync Calendar",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Sync with Calendar",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Export your shifts to Google or Apple Calendar using standard iCalendar (.ics) files. Tap any option below to share and import instantly!",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Option 1: Current day's shifts
+                    OutlinedButton(
+                        onClick = {
+                            exportScheduleToCalendarFile(context, todaysShifts, jobs)
+                            showExportDialog = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_today_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = todaysShifts.isNotEmpty(),
+                        colors = ButtonDefaults.outlinedButtonColors()
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                text = "Export Selected Day",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val displayDate = try {
+                                LocalDate.parse(selectedDate).format(DateTimeFormatter.ofPattern("MMM dd"))
+                            } catch (e: Exception) {
+                                selectedDate
+                            }
+                            Text(
+                                text = "$displayDate (${todaysShifts.size} Shift${if (todaysShifts.size == 1) "" else "s"})",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Option 2: Active Week's Shifts
+                    OutlinedButton(
+                        onClick = {
+                            exportScheduleToCalendarFile(context, relativeWeekShifts, jobs)
+                            showExportDialog = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_week_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = relativeWeekShifts.isNotEmpty(),
+                        colors = ButtonDefaults.outlinedButtonColors()
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                text = "Export Active Week",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val dateRangeStr = try {
+                                val parsedDate = LocalDate.parse(selectedDate)
+                                val monday = parsedDate.minusDays((parsedDate.dayOfWeek.value - 1).toLong())
+                                val sunday = monday.plusDays(6)
+                                "${monday.format(DateTimeFormatter.ofPattern("MMM dd"))} - ${sunday.format(DateTimeFormatter.ofPattern("MMM dd"))}"
+                            } catch (e: Exception) {
+                                "Current Week"
+                            }
+                            Text(
+                                text = "$dateRangeStr (${relativeWeekShifts.size} Shift${if (relativeWeekShifts.size == 1) "" else "s"})",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Option 3: All Scheduled Shifts
+                    Button(
+                        onClick = {
+                            exportScheduleToCalendarFile(context, shifts, jobs)
+                            showExportDialog = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_all_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = shifts.isNotEmpty()
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                text = "Export All Scheduled",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "All time (${shifts.size} Shift${if (shifts.size == 1) "" else "s"})",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -1476,6 +1644,89 @@ fun exportShiftToCalendar(context: android.content.Context, shift: Shift, job: J
         context.startActivity(intent)
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+fun generateICSContent(shiftsToExport: List<Shift>, jobs: List<Job>): String {
+    val builder = StringBuilder()
+    builder.append("BEGIN:VCALENDAR\r\n")
+    builder.append("VERSION:2.0\r\n")
+    builder.append("PRODID:-//JobShift//Schedule Planner v1.0//EN\r\n")
+    builder.append("CALSCALE:GREGORIAN\r\n")
+    
+    val dateParser = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val timeParser = DateTimeFormatter.ofPattern("HH:mm")
+    
+    for (shift in shiftsToExport) {
+        val job = jobs.firstOrNull { it.id == shift.jobId }
+        val title = "${job?.title ?: "Shift"} at ${job?.company ?: "Work"}"
+        val location = job?.address ?: ""
+        val description = "Shift Notes: ${shift.notes ?: ""}\\nTransit Mode: ${shift.transitMode ?: "None"}"
+        
+        try {
+            val localDate = LocalDate.parse(shift.date, dateParser)
+            val startTime = LocalTime.parse(shift.startTime, timeParser)
+            val endTime = LocalTime.parse(shift.endTime, timeParser)
+            
+            var endLocalDate = localDate
+            if (endTime.isBefore(startTime)) {
+                endLocalDate = localDate.plusDays(1)
+            }
+            
+            val dtStartStr = localDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "T" + startTime.format(DateTimeFormatter.ofPattern("HHmm")) + "00"
+            val dtEndStr = endLocalDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "T" + endTime.format(DateTimeFormatter.ofPattern("HHmm")) + "00"
+            
+            val timeStamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
+            
+            builder.append("BEGIN:VEVENT\r\n")
+            builder.append("UID:shift_${shift.id}_${shift.date}@jobshift.com\r\n")
+            builder.append("DTSTAMP:${timeStamp}Z\r\n")
+            builder.append("DTSTART:${dtStartStr}\r\n")
+            builder.append("DTEND:${dtEndStr}\r\n")
+            builder.append("SUMMARY:${title}\r\n")
+            builder.append("DESCRIPTION:${description}\r\n")
+            builder.append("LOCATION:${location}\r\n")
+            builder.append("END:VEVENT\r\n")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    builder.append("END:VCALENDAR\r\n")
+    return builder.toString()
+}
+
+fun exportScheduleToCalendarFile(context: android.content.Context, shiftsToExport: List<Shift>, jobs: List<Job>) {
+    if (shiftsToExport.isEmpty()) {
+        android.widget.Toast.makeText(context, "No scheduled shifts to export!", android.widget.Toast.LENGTH_SHORT).show()
+        return
+    }
+    
+    val icsStr = generateICSContent(shiftsToExport, jobs)
+    try {
+        val exportDir = java.io.File(context.cacheDir, "export")
+        if (!exportDir.exists()) {
+            exportDir.mkdirs()
+        }
+        val file = java.io.File(exportDir, "jobshift_schedule.ics")
+        file.writeText(icsStr)
+        
+        val authority = "${context.packageName}.fileprovider"
+        val contentUri = androidx.core.content.FileProvider.getUriForFile(context, authority, file)
+        
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/calendar"
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            putExtra(Intent.EXTRA_SUBJECT, "JobShift Schedule Export")
+            putExtra(Intent.EXTRA_TEXT, "Here is my JobShift dual-work schedule calendar export file (.ics). Open this on your device to instantly import all these shifts into Google Calendar or Apple Calendar!")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        val chooser = Intent.createChooser(intent, "Sync Schedule with Google/Apple Calendar")
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        android.widget.Toast.makeText(context, "Failed to generate schedule file: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
 
