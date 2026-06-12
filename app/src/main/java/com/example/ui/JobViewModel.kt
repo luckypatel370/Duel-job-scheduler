@@ -98,6 +98,17 @@ class JobViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun addShifts(shiftsToInsert: List<Shift>) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            shiftsToInsert.forEach { shift ->
+                repository.insertShift(shift)
+            }
+            _isLoading.value = false
+            updateWidget()
+        }
+    }
+
     fun deleteShift(shift: Shift) {
         viewModelScope.launch {
             _isLoading.value = true

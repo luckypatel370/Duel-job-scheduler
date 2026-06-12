@@ -77,6 +77,9 @@ fun JobScheduleScreen(
     var showAddJobDialog by remember { mutableStateOf(false) }
     var showAddShiftDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var isMonthView by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf(0) } // 0 = Schedule, 1 = Job Profiles
 
     // Date range preparation for calendar strip (centered around selected/today)
@@ -220,12 +223,118 @@ fun JobScheduleScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // Horizontal scroll calendar strip
-                CalendarStrip(
-                    dates = dates,
-                    selectedDate = selectedDate,
-                    onDateSelected = { viewModel.selectDate(it) }
-                )
+                // High-fidelity View Toggle Switcher (Week vs Month)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isMonthView) "Monthly Shift View" else "Weekly Shift View",
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Row(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { isMonthView = false },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (!isMonthView) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Weekly Strip View",
+                                tint = if (!isMonthView) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { isMonthView = true },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isMonthView) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Monthly Grid View",
+                                tint = if (isMonthView) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Quick Scheduling Chips Row (Provides 1-click discoverability)
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        AssistChip(
+                            onClick = {
+                                if (jobs.isEmpty()) {
+                                    showAddJobDialog = true
+                                } else {
+                                    showAddShiftDialog = true
+                                }
+                            },
+                            label = { Text("Add Shift", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                            leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp)) },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                    item {
+                        AssistChip(
+                            onClick = { showImportDialog = true },
+                            label = { Text("Import from Calendar", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) },
+                            leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp)) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+                        )
+                    }
+                    item {
+                        AssistChip(
+                            onClick = { showShareDialog = true },
+                            label = { Text("Share with Friends", fontSize = 11.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold) },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(12.dp)) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF2E7D32).copy(alpha = 0.05f))
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                if (isMonthView) {
+                    MonthCalendarGrid(
+                        selectedDate = selectedDate,
+                        shifts = shifts,
+                        jobs = jobs,
+                        onDateSelected = { viewModel.selectDate(it) }
+                    )
+                } else {
+                    // Horizontal scroll calendar strip
+                    CalendarStrip(
+                        dates = dates,
+                        selectedDate = selectedDate,
+                        onDateSelected = { viewModel.selectDate(it) }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -275,6 +384,27 @@ fun JobScheduleScreen(
                 viewModel.addShift(jobId, date, start, end, mode, notes)
                 showAddShiftDialog = false
             }
+        )
+    }
+
+    if (showImportDialog) {
+        ImportCalendarShiftsDialog(
+            jobs = jobs,
+            onDismiss = { showImportDialog = false },
+            onImportShifts = { importedList ->
+                viewModel.addShifts(importedList)
+                showImportDialog = false
+            }
+        )
+    }
+
+    if (showShareDialog) {
+        ShareWithFriendsDialog(
+            selectedDate = selectedDate,
+            todaysShifts = todaysShifts,
+            allShifts = shifts,
+            jobs = jobs,
+            onDismiss = { showShareDialog = false }
         )
     }
 
@@ -1379,6 +1509,7 @@ fun AddShiftDialog(
     var notes by remember { mutableStateOf("") }
 
     val travelModes = listOf("Driving", "Transit", "Bicycling", "Walking")
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -1450,49 +1581,185 @@ fun AddShiftDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Interactive/Visual Date Selector (Non-typing!)
                 OutlinedTextField(
                     value = inputDate,
-                    onValueChange = { inputDate = it },
-                    label = { Text("Date (YYYY-MM-DD)") },
-                    placeholder = { Text("e.g. 2026-06-12") },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Work Date") },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                showDatePicker(context, inputDate) { selected ->
+                                    inputDate = selected
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.DateRange, contentDescription = "Select Date")
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable {
+                            showDatePicker(context, inputDate) { selected ->
+                                inputDate = selected
+                            }
+                        }
                         .testTag("shift_date_input"),
                     singleLine = true
                 )
-                Spacer(modifier = Modifier.height(10.dp))
 
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = startTime,
-                        onValueChange = { startTime = it },
-                        label = { Text("Start (24h HH:MM)") },
-                        placeholder = { Text("09:00") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 4.dp)
-                            .testTag("shift_start_input"),
-                        singleLine = true
+                // Time Presets
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Quick Shift Presets",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val presets = listOf(
+                        "9 AM - 5 PM" to ("09:00" to "17:00"),
+                        "8 AM - 4 PM" to ("08:00" to "16:00"),
+                        "12 PM - 8 PM" to ("12:00" to "20:00"),
+                        "10 PM - 6 AM" to ("22:00" to "06:00"),
+                        "6 AM - 2 PM" to ("06:00" to "14:00")
                     )
-                    OutlinedTextField(
-                        value = endTime,
-                        onValueChange = { endTime = it },
-                        label = { Text("End (24h HH:MM)") },
-                        placeholder = { Text("17:00") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 4.dp)
-                            .testTag("shift_end_input"),
-                        singleLine = true
-                    )
+                    items(presets) { preset ->
+                        Surface(
+                            modifier = Modifier.clickable {
+                                startTime = preset.second.first
+                                endTime = preset.second.second
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Text(
+                                text = preset.first,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
+
+                // Interactive 30-min Step Adjusters
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Start Time Adjusters
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Start Time",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                                .padding(2.dp)
+                        ) {
+                            IconButton(
+                                onClick = { startTime = adjustTime(startTime, -30) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowLeft,
+                                    contentDescription = "Minus 30m"
+                                )
+                            }
+                            
+                            Text(
+                                text = startTime,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("shift_start_display")
+                            )
+                            
+                            IconButton(
+                                onClick = { startTime = adjustTime(startTime, 30) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowRight,
+                                    contentDescription = "Plus 30m"
+                                )
+                            }
+                        }
+                    }
+                    
+                    // End Time Adjusters
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "End Time",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                                .padding(2.dp)
+                        ) {
+                            IconButton(
+                                onClick = { endTime = adjustTime(endTime, -30) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowLeft,
+                                    contentDescription = "Minus 30m"
+                                )
+                            }
+                            
+                            Text(
+                                text = endTime,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("shift_end_display")
+                            )
+                            
+                            IconButton(
+                                onClick = { endTime = adjustTime(endTime, 30) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowRight,
+                                    contentDescription = "Plus 30m"
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Select Travel Mode picker
                 Text(
                     text = "Mode of Travel to Next Stop",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1552,7 +1819,7 @@ fun AddShiftDialog(
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1867,6 +2134,978 @@ fun UpcomingShiftWidget(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+// --- ADDITIONAL CALENDAR & UTILITY ADAPTERS FOR ADVANCED CALENDAR EXPERIENCE ---
+
+data class CalendarEvent(
+    val id: Long,
+    val title: String,
+    val description: String?,
+    val location: String?,
+    val startTimeMillis: Long,
+    val endTimeMillis: Long
+) {
+    val dateString: String by lazy {
+        java.time.Instant.ofEpochMilli(startTimeMillis)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDate()
+            .toString() // YYYY-MM-DD
+    }
+    
+    val startTimeString: String by lazy {
+        val time = java.time.Instant.ofEpochMilli(startTimeMillis)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalTime()
+        String.format(java.util.Locale.US, "%02d:%02d", time.hour, time.minute)
+    }
+
+    val endTimeString: String by lazy {
+        val time = java.time.Instant.ofEpochMilli(endTimeMillis)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalTime()
+        String.format(java.util.Locale.US, "%02d:%02d", time.hour, time.minute)
+    }
+}
+
+fun fetchCalendarEvents(context: android.content.Context, daysOffset: Int = 30): List<CalendarEvent> {
+    val eventsList = mutableListOf<CalendarEvent>()
+    val contentResolver = context.contentResolver
+    
+    val uri = android.provider.CalendarContract.Events.CONTENT_URI
+    val projection = arrayOf(
+        android.provider.CalendarContract.Events._ID,
+        android.provider.CalendarContract.Events.TITLE,
+        android.provider.CalendarContract.Events.DESCRIPTION,
+        android.provider.CalendarContract.Events.EVENT_LOCATION,
+        android.provider.CalendarContract.Events.DTSTART,
+        android.provider.CalendarContract.Events.DTEND
+    )
+    
+    // Range: from 14 days ago to 30 days in future
+    val now = System.currentTimeMillis()
+    val startMillis = now - (14 * 24 * 60 * 60 * 1000L)
+    val endMillis = now + (daysOffset * 24 * 60 * 60 * 1000L)
+    
+    val selection = "(${android.provider.CalendarContract.Events.DTSTART} >= ?) AND (${android.provider.CalendarContract.Events.DTSTART} <= ?) AND (${android.provider.CalendarContract.Events.DELETED} != 1)"
+    val selectionArgs = arrayOf(startMillis.toString(), endMillis.toString())
+    val sortOrder = "${android.provider.CalendarContract.Events.DTSTART} ASC"
+    
+    try {
+        val cursor = contentResolver.query(
+            uri,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
+        )
+        
+        cursor?.use { c ->
+            val idCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events._ID)
+            val titleCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events.TITLE)
+            val descCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events.DESCRIPTION)
+            val locCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events.EVENT_LOCATION)
+            val startCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events.DTSTART)
+            val endCol = c.getColumnIndexOrThrow(android.provider.CalendarContract.Events.DTEND)
+            
+            while (c.moveToNext()) {
+                val id = c.getLong(idCol)
+                val title = c.getString(titleCol) ?: ""
+                val desc = c.getString(descCol)
+                val loc = c.getString(locCol)
+                val start = c.getLong(startCol)
+                val end = c.getLong(endCol)
+                
+                eventsList.add(
+                    CalendarEvent(
+                        id = id,
+                        title = title,
+                        description = desc,
+                        location = loc,
+                        startTimeMillis = start,
+                        endTimeMillis = end
+                    )
+                )
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    
+    return eventsList
+}
+
+@Composable
+fun ImportCalendarShiftsDialog(
+    jobs: List<Job>,
+    onDismiss: () -> Unit,
+    onImportShifts: (shiftsToImport: List<com.example.data.model.Shift>) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var hasPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_CALENDAR
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            hasPermission = isGranted
+        }
+    )
+    
+    var calendarEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
+    var loaded by remember { mutableStateOf(false) }
+    var selectedEvents by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectedJobForEvents by remember { mutableStateOf<Int?>(jobs.firstOrNull()?.id) }
+    
+    // Auto load events when permission is granted
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            calendarEvents = fetchCalendarEvents(context, daysOffset = 30)
+            loaded = true
+        }
+    }
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Import Calendar Shifts",
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                if (!hasPermission) {
+                    Text(
+                        text = "To import your shifts directly from your device calendar, please grant Calendar permission in settings or app popups.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { permissionLauncher.launch(android.Manifest.permission.READ_CALENDAR) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Grant Calendar Access")
+                    }
+                } else {
+                    if (jobs.isEmpty()) {
+                        Text(
+                            text = "Please create at least one Employer Profile first. This lets us calculate your transit time and matching coordinates!",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Go create a Profile")
+                        }
+                    } else {
+                        Text(
+                            text = "We found these events on your local Google or Apple calendar. Select which template employer profile they represent, click sync to bulk import!",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            text = "Sync to Employer Profile:",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        // Horizontal scroll of jobs
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(jobs.size) { idx ->
+                                val job = jobs[idx]
+                                val corrColor = parseHexColor(job.colorHex)
+                                val isSelected = selectedJobForEvents == job.id
+                                Card(
+                                    modifier = Modifier.clickable { selectedJobForEvents = job.id },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) corrColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    ),
+                                    border = BorderStroke(
+                                        2.dp,
+                                        if (isSelected) corrColor else Color.Transparent
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(corrColor, CircleShape)
+                                                .size(8.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(text = job.company, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // List of calendar events
+                        if (calendarEvents.isEmpty() && loaded) {
+                            Text(
+                                text = "No local calendar events found in the upcoming month.",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        } else {
+                            Text(
+                                text = "Choose Shifts to Import:",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .heightIn(max = 200.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(calendarEvents.size) { index ->
+                                    val event = calendarEvents[index]
+                                    val isChecked = selectedEvents.contains(event.id)
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isChecked) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isChecked) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedEvents = if (isChecked) {
+                                                    selectedEvents - event.id
+                                                } else {
+                                                    selectedEvents + event.id
+                                                }
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Checkbox(
+                                                checked = isChecked,
+                                                onCheckedChange = { _ ->
+                                                    selectedEvents = if (isChecked) {
+                                                        selectedEvents - event.id
+                                                    } else {
+                                                        selectedEvents + event.id
+                                                    }
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = event.title,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${event.dateString} • ${event.startTimeString} - ${event.endTimeString}",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                if (!event.location.isNullOrBlank()) {
+                                                    Text(
+                                                        text = "📍 ${event.location}",
+                                                        fontSize = 10.sp,
+                                                        color = MaterialTheme.colorScheme.outline,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(14.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    val targetJobId = selectedJobForEvents ?: return@Button
+                                    val shiftsList = calendarEvents.filter { selectedEvents.contains(it.id) }.map {
+                                        com.example.data.model.Shift(
+                                            jobId = targetJobId,
+                                            date = it.dateString,
+                                            startTime = it.startTimeString,
+                                            endTime = it.endTimeString,
+                                            notes = it.title + (if (it.description.isNullOrEmpty()) "" else " - ${it.description}"),
+                                            transitMode = "Driving"
+                                        )
+                                    }
+                                    onImportShifts(shiftsList)
+                                },
+                                enabled = selectedEvents.isNotEmpty() && selectedJobForEvents != null,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Sync (${selectedEvents.size})")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthCalendarGrid(
+    selectedDate: String,
+    shifts: List<Shift>,
+    jobs: List<Job>,
+    onDateSelected: (String) -> Unit
+) {
+    var calendarMonthDate by remember { mutableStateOf(LocalDate.now().withDayOfMonth(1)) }
+    
+    val selectedLocalDate = try {
+        LocalDate.parse(selectedDate)
+    } catch (e: Exception) {
+        LocalDate.now()
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+            // Header with Navigation
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { calendarMonthDate = calendarMonthDate.minusMonths(1) }
+                ) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowLeft, contentDescription = "Prev Month")
+                }
+                
+                Text(
+                    text = calendarMonthDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                IconButton(
+                    onClick = { calendarMonthDate = calendarMonthDate.plusMonths(1) }
+                ) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowRight, contentDescription = "Next Month")
+                }
+            }
+            
+            // Grid of Days of the Week headers (M, T, W, ...)
+            val weekDays = listOf("M", "T", "W", "T", "F", "S", "S")
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                weekDays.forEach { day ->
+                    Text(
+                        text = day,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.width(36.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Grid of dates
+            val firstDayOfWeek = calendarMonthDate.dayOfWeek.value // 1 (Mon) to 7 (Sun)
+            val daysInMonth = calendarMonthDate.lengthOfMonth()
+            
+            val datesToDisplay = remember(calendarMonthDate) {
+                val list = mutableListOf<LocalDate?>()
+                // Padding for empty spaces before the 1st of the month
+                for (i in 1 until firstDayOfWeek) {
+                    list.add(null)
+                }
+                // Add actual dates
+                for (day in 1..daysInMonth) {
+                    list.add(calendarMonthDate.withDayOfMonth(day))
+                }
+                // Padding for remaining grid cells
+                while (list.size < 42) {
+                    list.add(null)
+                }
+                list
+            }
+            
+            // Chunk dates into rows of 7 days
+            val rows = datesToDisplay.chunked(7)
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                rows.forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        row.forEach { date ->
+                            if (date != null) {
+                                val isSelected = date == selectedLocalDate
+                                val isToday = date == LocalDate.now()
+                                val ISOStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                
+                                // Find shifts scheduled on this specific date
+                                val shiftsForThisDay = shifts.filter { it.date == ISOStr }
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 40.dp, height = 44.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            when {
+                                                isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                                isToday -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                                                else -> Color.Transparent
+                                            }
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = when {
+                                                isSelected -> MaterialTheme.colorScheme.primary
+                                                isToday -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                                                else -> Color.Transparent
+                                            },
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { onDateSelected(ISOStr) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Text(
+                                            text = date.dayOfMonth.toString(),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
+                                            color = when {
+                                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            }
+                                        )
+                                        
+                                        // Color dots for jobs
+                                        if (shiftsForThisDay.isNotEmpty()) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            ) {
+                                                // Take up to 3 dots to prevent overflows
+                                                shiftsForThisDay.take(3).forEach { shift ->
+                                                    val job = jobs.firstOrNull { it.id == shift.jobId }
+                                                    val dotColor = job?.let { parseHexColor(it.colorHex) } ?: MaterialTheme.colorScheme.primary
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(4.dp)
+                                                            .background(dotColor, CircleShape)
+                                                    )
+                                                }
+                                                if (shiftsForThisDay.size > 3) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(4.dp)
+                                                            .background(Color.Gray, CircleShape)
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Empty space padding for grid aligning
+                                Box(modifier = Modifier.size(width = 40.dp, height = 44.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun showDatePicker(context: android.content.Context, initialDate: String, onDateSelected: (String) -> Unit) {
+    val parsedDate = try {
+        LocalDate.parse(initialDate)
+    } catch (e: Exception) {
+        LocalDate.now()
+    }
+    
+    android.app.DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val selected = LocalDate.of(year, month + 1, dayOfMonth)
+            onDateSelected(selected.format(DateTimeFormatter.ISO_LOCAL_DATE))
+        },
+        parsedDate.year,
+        parsedDate.monthValue - 1,
+        parsedDate.dayOfMonth
+    ).show()
+}
+
+fun adjustTime(timeStr: String, minutesToAdd: Int): String {
+    return try {
+        val parser = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        val parsed = java.time.LocalTime.parse(timeStr, parser)
+        val adjusted = parsed.plusMinutes(minutesToAdd.toLong())
+        adjusted.format(parser)
+    } catch (e: Exception) {
+        timeStr
+    }
+}
+
+@Composable
+fun ShareWithFriendsDialog(
+    selectedDate: String,
+    todaysShifts: List<Shift>,
+    allShifts: List<Shift>,
+    jobs: List<Job>,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // 1. Today's summary text
+    val todaySummaryText = remember(selectedDate, todaysShifts, jobs) {
+        try {
+            val dateObj = LocalDate.parse(selectedDate)
+            val formattedDate = dateObj.format(DateTimeFormatter.ofPattern("EEEE, MMM dd"))
+            val sb = java.lang.StringBuilder()
+            sb.append("📅 My Shift Schedule for $formattedDate:\n")
+            sb.append("---------------------------------\n")
+            if (todaysShifts.isEmpty()) {
+                sb.append("No shifts scheduled today - free time! 🎉\n")
+            } else {
+                todaysShifts.forEachIndexed { idx, shift ->
+                    val job = jobs.firstOrNull { it.id == shift.jobId }
+                    val company = job?.company ?: "Work"
+                    val title = job?.title ?: "Shift"
+                    sb.append("⏱️ ${shift.startTime} - ${shift.endTime}\n")
+                    sb.append("💼 $company ($title)\n")
+                    if (!shift.notes.isNullOrBlank()) {
+                        sb.append("📝 Notes: ${shift.notes}\n")
+                    }
+                    if (shift.transitTimeToNext != null && shift.transitTimeToNext!! > 0) {
+                        sb.append("🚗 Next commute: ${shift.transitTimeToNext} mins via ${shift.transitMode}\n")
+                    }
+                    if (idx < todaysShifts.size - 1) sb.append("\n")
+                }
+            }
+            sb.append("---------------------------------\n")
+            sb.append("Shared via Shift & Travel Tracker App! 🚀")
+            sb.toString()
+        } catch (e: Exception) {
+            "My shifts for $selectedDate"
+        }
+    }
+
+    // 2. Weekly summary text
+    val weeklySummaryText = remember(allShifts, selectedDate, jobs) {
+        try {
+            val dateObj = LocalDate.parse(selectedDate)
+            val monday = dateObj.minusDays((dateObj.dayOfWeek.value - 1).toLong())
+            val sunday = monday.plusDays(6)
+            
+            val weekShifts = allShifts.filter {
+                try {
+                    val d = LocalDate.parse(it.date)
+                    !d.isBefore(monday) && !d.isAfter(sunday)
+                } catch (e: Exception) {
+                    false
+                }
+            }.sortedWith(compareBy({ it.date }, { it.startTime }))
+
+            val sb = java.lang.StringBuilder()
+            sb.append("📅 My Weekly Shift Agenda\n")
+            sb.append("🗓️ ${monday.format(DateTimeFormatter.ofPattern("MMM dd"))} - ${sunday.format(DateTimeFormatter.ofPattern("MMM dd"))}\n")
+            sb.append("---------------------------------\n")
+            
+            if (weekShifts.isEmpty()) {
+                sb.append("No shifts scheduled for this week! ✈️\n")
+            } else {
+                var previousDate = ""
+                weekShifts.forEach { shift ->
+                    val job = jobs.firstOrNull { it.id == shift.jobId }
+                    val company = job?.company ?: "Work"
+                    val parsedD = LocalDate.parse(shift.date)
+                    val dayHeader = parsedD.format(DateTimeFormatter.ofPattern("EE MMM dd"))
+                    
+                    if (dayHeader != previousDate) {
+                        sb.append("\n📌 $dayHeader\n")
+                        previousDate = dayHeader
+                    }
+                    sb.append("  • ${shift.startTime} - ${shift.endTime} | $company\n")
+                }
+                
+                val totalHours = weekShifts.sumOf { calculateHoursDecimal(it.startTime, it.endTime) }
+                val totalEarnings = weekShifts.sumOf { shift ->
+                    val job = jobs.firstOrNull { it.id == shift.jobId } ?: return@sumOf 0.0
+                    calculateHoursDecimal(shift.startTime, shift.endTime) * job.hourlyRate
+                }
+                
+                sb.append("\n---------------------------------\n")
+                sb.append("📊 Summary: ${String.format(Locale.US, "%.1f", totalHours)} Hrs | \$${String.format(Locale.US, "%.2f", totalEarnings)} Est. Earnings\n")
+            }
+            sb.append("---------------------------------\n")
+            sb.append("Shared via Shift & Travel Tracker App! 🚀")
+            sb.toString()
+        } catch (e: Exception) {
+            "My weekly shift schedule"
+        }
+    }
+
+    // 3. Referral text
+    val referralText = "Hey! Check out this amazing Shift & Travel Tracker app I'm using. It helps you manage multiple jobs, import shifts from your calendar, calculate commute times between shifts, and view your schedule on the home screen! Try it here:\n\n👉 https://ais-pre-ehrsin6wser4oa7r2qjbsa-793698965295.us-east1.run.app"
+
+    fun shareText(text: String) {
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, "Share with friends")
+        context.startActivity(shareIntent)
+    }
+
+    fun copyToClipboard(text: String) {
+        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Shift Schedule", text)
+        clipboard.setPrimaryClip(clip)
+        android.widget.Toast.makeText(context, "Copied schedule to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header Icon & Title
+                Box(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), CircleShape)
+                        .padding(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                Text(
+                    text = "Share with Friends",
+                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Keep coworkers, friends, and family in the loop with beautiful, structured work schedule cards.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                )
+                
+                // Content Selections
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Option 1: Share Today's Shift
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Today's Schedule Info",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${todaysShifts.size} shift${if (todaysShifts.size == 1) "" else "s"} scheduled",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(
+                                    onClick = { copyToClipboard(todaySummaryText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Copy text",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { shareText(todaySummaryText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share text",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Option 2: Share This Week's Agenda
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Weekly Work Summary",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Total earnings, hours, and days",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(
+                                    onClick = { copyToClipboard(weeklySummaryText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Copy text",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { shareText(weeklySummaryText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share text",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Option 3: Invite Friends (App Referral)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Send App Invite Link",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Invite coworkers to check out Shift Tracker!",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(
+                                    onClick = { copyToClipboard(referralText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Copy Link",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { shareText(referralText) },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share Invite",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Dismiss Action
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Close", fontWeight = FontWeight.Bold)
                 }
             }
         }
